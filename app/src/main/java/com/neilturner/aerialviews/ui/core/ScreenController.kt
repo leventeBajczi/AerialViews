@@ -47,7 +47,9 @@ import kotlin.math.abs
 import androidx.exifinterface.media.ExifInterface
 import java.io.ByteArrayInputStream
 import android.net.Uri
-
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 
 class ScreenController(
     private val context: Context,
@@ -227,7 +229,12 @@ class ScreenController(
                         val datetime = exif.getAttribute(ExifInterface.TAG_DATETIME) ?: "Unknown date"
 
                         val locationInfo = if (hasLatLong) {
-                            "Lat: ${latLong[0]}, Lon: ${latLong[1]}"
+                            val city = getCityFromCoordinates(latLong[0].toDouble(), latLong[1].toDouble())
+                            if(city == null || city == "") {
+                                "Lat: ${latLong[0]}, Lon: ${latLong[1]}"
+                            } else {
+                                city
+                            }
                         } else {
                             "No GPS metadata"
                         }
@@ -247,6 +254,33 @@ class ScreenController(
             }
         } else {
             processMedia(media)
+        }
+    }
+
+    suspend fun getCityFromCoordinates(lat: Double, lon: Double): String? {
+        val client = OkHttpClient()
+        val url = "https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon"
+
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "YourAppName/1.0")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return null
+            val json = JSONObject(response.body?.string() ?: return null)
+            val address = json.optJSONObject("address") ?: return null
+
+            val city = address.optString("city")
+                .ifEmpty { address.optString("town") }
+                .ifEmpty { address.optString("village") }
+            val country = address.optString("country")
+
+            // Join non-empty parts with ", "
+            return listOf(city, country)
+                .filter { it.isNotEmpty() }
+                .joinToString(", ")
+                .ifEmpty { null }
         }
     }
 
