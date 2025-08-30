@@ -240,8 +240,8 @@ class ScreenController(
                         }
 
                         media.description = buildString {
-                            append("$datetime\n")
-                            if (hasLatLong) append("$locationInfo")
+                            append("$datetime")
+                            if (hasLatLong) append("\n$locationInfo")
                         }
                     } catch (e: Exception) {
                         Timber.w(e, "Failed to read EXIF metadata for ${media.uri}")
