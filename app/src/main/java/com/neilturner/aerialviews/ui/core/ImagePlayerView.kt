@@ -142,7 +142,10 @@ class ImagePlayerView :
                 coroutineScope.launch { loadSambaImage(media.uri) }
             }
             AerialMediaSource.WEBDAV -> {
-                coroutineScope.launch { if(media.byteArray!=null) loadWebDavImage(media.byteArray!!) }
+                coroutineScope.launch { if(media.byteArray!=null) {
+                    loadWebDavImage(media.byteArray!!)
+                    media.byteArray = null
+                } }
             }
             else -> {
                 coroutineScope.launch { loadImage(media.uri) }
