@@ -15,7 +15,7 @@ plugins {
 
 fun loadProperties(fileName: String): Properties {
     val properties = Properties()
-    val propertiesFile = rootProject.file("signing/$fileName")
+    val propertiesFile = rootProject.file(".gradle/$fileName")
     if (propertiesFile.exists()) {
         properties.load(FileInputStream(propertiesFile))
     }
@@ -85,8 +85,8 @@ android {
         getByName("release") {
             buildConfigField("String", "BUILD_TIME", "\"${System.currentTimeMillis()}\"")
 
-            isMinifyEnabled = true
-            isShrinkResources = true
+            //isMinifyEnabled = true
+            //isShrinkResources = true
             // isDebuggable = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
 
@@ -98,7 +98,7 @@ android {
 
     signingConfigs {
         create("release") {
-            val releaseProps = loadProperties("release.properties")
+            val releaseProps = loadProperties("gradle.properties")
             storeFile = releaseProps["storeFile"]?.let { file(it) }
             storePassword = releaseProps["storePassword"] as String?
             keyAlias = releaseProps["keyAlias"] as String?
@@ -115,30 +115,7 @@ android {
 
     flavorDimensions += "version"
     productFlavors {
-        create("github") {
-            signingConfig = signingConfigs.getByName("legacy")
-            dimension = "version"
-        }
-        create("beta") {
-            signingConfig = signingConfigs.getByName("legacy")
-            dimension = "version"
-            isDefault = true
-            versionNameSuffix = betaVersion
-        }
         create("googleplay") {
-            signingConfig = signingConfigs.getByName("release")
-            dimension = "version"
-        }
-        create("googleplaybeta") {
-            signingConfig = signingConfigs.getByName("release")
-            dimension = "version"
-            versionNameSuffix = betaVersion
-        }
-        create("amazon") {
-            signingConfig = signingConfigs.getByName("release")
-            dimension = "version"
-        }
-        create("fdroid") {
             signingConfig = signingConfigs.getByName("release")
             dimension = "version"
         }
@@ -146,22 +123,13 @@ android {
 
     // Using this method https://stackoverflow.com/a/30548238/247257
     sourceSets {
-        getByName("github").java.srcDir("src/common/java")
-        getByName("beta").java.srcDir("src/common/java")
         getByName("googleplay").java.srcDir("src/common/java")
-        getByName("googleplaybeta").java.srcDir("src/common/java")
-        getByName("amazon").java.srcDir("src/common/java")
-        getByName("fdroid").java.srcDir("src/froid/java")
     }
 }
 
 dependencies {
     // Support all favors except F-Droid
-    "githubImplementation"(libs.bundles.firebase)
-    "betaImplementation"(libs.bundles.firebase)
     "googleplayImplementation"(libs.bundles.firebase)
-    "googleplaybetaImplementation"(libs.bundles.firebase)
-    "amazonImplementation"(libs.bundles.firebase)
 
     implementation(libs.bundles.kotlin)
     implementation(libs.bundles.androidx)
@@ -176,6 +144,8 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.smbj)
     implementation(libs.timber)
+
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
 
     debugImplementation(libs.leakcanary)
     testImplementation(libs.junit.jupiter.api)

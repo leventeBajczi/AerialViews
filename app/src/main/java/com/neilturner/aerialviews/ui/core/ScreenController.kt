@@ -7,6 +7,7 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
+import android.util.Log
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -33,12 +34,20 @@ import com.neilturner.aerialviews.utils.FontHelper
 import com.neilturner.aerialviews.utils.OverlayHelper
 import com.neilturner.aerialviews.utils.PermissionHelper
 import com.neilturner.aerialviews.utils.WindowHelper
+import com.neilturner.aerialviews.models.enums.AerialMediaSource
+import com.neilturner.aerialviews.models.prefs.WebDavMediaPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.thegrizzlylabs.sardineandroid.impl.OkHttpSardine
+import kotlinx.coroutines.withContext
 import me.kosert.flowbus.GlobalBus
 import timber.log.Timber
 import kotlin.math.abs
+import androidx.exifinterface.media.ExifInterface
+import java.io.ByteArrayInputStream
+import android.net.Uri
+
 
 class ScreenController(
     private val context: Context,
@@ -203,6 +212,46 @@ class ScreenController(
             Timber.i("Loading: ${media.description} - ${media.uri} (${media.poi})")
         }
 
+        if (media.source == AerialMediaSource.WEBDAV) {
+            CoroutineScope(Dispatchers.IO).launch {
+                val byteArray = byteArrayFromWebDavFile(media.uri)
+                media.byteArray = byteArray
+
+                if (media.type == AerialMediaType.IMAGE && byteArray != null && byteArray.isNotEmpty()) {
+                    try {
+                        val exif = ExifInterface(ByteArrayInputStream(byteArray))
+
+                        val latLong = FloatArray(2)
+                        val hasLatLong = exif.getLatLong(latLong)
+
+                        val datetime = exif.getAttribute(ExifInterface.TAG_DATETIME) ?: "Unknown date"
+
+                        val locationInfo = if (hasLatLong) {
+                            "Lat: ${latLong[0]}, Lon: ${latLong[1]}"
+                        } else {
+                            "No GPS metadata"
+                        }
+
+                        media.description = buildString {
+                            append("$datetime\n")
+                            if (hasLatLong) append("$locationInfo")
+                        }
+                    } catch (e: Exception) {
+                        Timber.w(e, "Failed to read EXIF metadata for ${media.uri}")
+                        media.description = "${media.uri.lastPathSegment} (no EXIF)"
+                    }
+                    withContext(Dispatchers.Main) {
+                        processMedia(media)
+                    }
+                }
+            }
+        } else {
+            processMedia(media)
+        }
+    }
+
+    private fun processMedia(media: AerialMedia) {
+
         // Set overlay data for current video
         overlayHelper.findOverlay<TextLocation>().forEach {
             val locationType = GeneralPrefs.descriptionVideoManifestStyle
@@ -252,6 +301,17 @@ class ScreenController(
         }
 
         videoPlayer.start()
+    }
+
+    private fun byteArrayFromWebDavFile(uri: Uri): ByteArray? {
+        try {
+            val client = OkHttpSardine()
+            client.setCredentials(WebDavMediaPrefs.userName, WebDavMediaPrefs.password)
+            return client.get(uri.toString()).readBytes()
+        } catch(e: Exception) {
+            Log.w("aerial", "Failed to load ${uri} due to error ${e}")
+            return null
+        }
     }
 
     private fun fadeOutLoadingText() {
@@ -442,7 +502,19 @@ class ScreenController(
 
     override fun onVideoError() = handleError()
 
-    override fun onImageFinished() = fadeOutCurrentItem()
+    override fun onImageFinished() {
+        val media =
+            if (!previousItem) {
+                playlist.nextItem()
+            } else {
+                playlist.previousItem()
+            }
+        previousItem = false
+
+        if (!blackOutMode) {
+            loadItem(media)
+        }
+    }
 
     override fun onImageError() = handleError()
 

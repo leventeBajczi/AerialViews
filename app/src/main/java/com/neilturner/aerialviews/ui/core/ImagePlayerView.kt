@@ -11,6 +11,7 @@ import coil.decode.ImageDecoderDecoder
 import coil.request.ErrorResult
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import coil.transition.TransitionTarget
 import com.hierynomus.msdtyp.AccessMask
 import com.hierynomus.mssmb2.SMB2CreateDisposition
 import com.hierynomus.mssmb2.SMB2ShareAccess
@@ -42,6 +43,8 @@ import okhttp3.OkHttpClient
 import timber.log.Timber
 import java.util.EnumSet
 import kotlin.time.Duration.Companion.milliseconds
+import android.graphics.drawable.Animatable
+import android.graphics.drawable.Drawable
 
 class ImagePlayerView :
     AppCompatImageView,
@@ -139,7 +142,7 @@ class ImagePlayerView :
                 coroutineScope.launch { loadSambaImage(media.uri) }
             }
             AerialMediaSource.WEBDAV -> {
-                coroutineScope.launch { loadWebDavImage(media.uri) }
+                coroutineScope.launch { if(media.byteArray!=null) loadWebDavImage(media.byteArray!!) }
             }
             else -> {
                 coroutineScope.launch { loadImage(media.uri) }
@@ -175,14 +178,22 @@ class ImagePlayerView :
         imageLoader.execute(request.build())
     }
 
-    private suspend fun loadWebDavImage(uri: Uri) {
+    private suspend fun loadWebDavImage(byteArray: ByteArray) {
         val request =
             ImageRequest
                 .Builder(context)
-                .target(this)
+                .crossfade(true)
+                .target(object : TransitionTarget {
+                    override val drawable get() = this@ImagePlayerView.drawable
+                    override val view get() = this@ImagePlayerView
+                    override fun onSuccess(result: Drawable) {
+                        this@ImagePlayerView.setImageDrawable(result)
+                        (result as? Animatable)?.start()
+                    }
+                })
 
         try {
-            val byteArray = byteArrayFromWebDavFile(uri)
+            // val byteArray = byteArrayFromWebDavFile(uri)
             request.data(byteArray)
         } catch (ex: Exception) {
             Timber.e(ex, "Exception while getting byte array from WebDAV resource: ${ex.message}")

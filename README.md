@@ -1,3 +1,5 @@
+set envs, then `./gradlew assembleRelease`
+
 # Aerial Views
 
 [![Latest GitHub release](https://img.shields.io/github/v/release/theothernt/AerialViews.svg?logo=github&label=GitHub&cacheSeconds=3600)](https://github.com/theothernt/AerialViews/releases/latest)

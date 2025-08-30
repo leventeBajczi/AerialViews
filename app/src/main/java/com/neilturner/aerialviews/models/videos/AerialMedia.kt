@@ -11,4 +11,6 @@ data class AerialMedia(
     var poi: Map<Int, String> = emptyMap(),
     var type: AerialMediaType = AerialMediaType.VIDEO,
     var source: AerialMediaSource = AerialMediaSource.DEFAULT,
-)
+) {
+    var byteArray: ByteArray? = null
+}
